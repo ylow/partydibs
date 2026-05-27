@@ -278,6 +278,102 @@ test('unclaim returns 404 for unknown id', async () => {
   assert.equal(res.status, 404);
 });
 
+test('POST /api/items/bulk requires admin', async () => {
+  const { app } = freshApp();
+  await request(app).post('/api/setup').send({ title: 'P', password: 'pw' });
+  const res = await request(app)
+    .post('/api/items/bulk')
+    .send({ csv: 'Chips\nSoda,Diet' });
+  assert.equal(res.status, 401);
+});
+
+test('POST /api/items/bulk with empty csv returns 200 added:0', async () => {
+  const { app } = freshApp();
+  const agent = await setupAndLogin(app);
+  const res = await agent.post('/api/items/bulk').send({ csv: '' });
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body, { added: 0, errors: [] });
+});
+
+test('POST /api/items/bulk parses lines, splits on first comma, trims', async () => {
+  const { app } = freshApp();
+  const agent = await setupAndLogin(app);
+  const csv = [
+    'Chips',
+    '  Soda  ,  Diet  ',
+    'Plates, paper, ~30 people',
+    '',
+    'Forks',
+  ].join('\n');
+  const res = await agent.post('/api/items/bulk').send({ csv });
+  assert.equal(res.status, 200);
+  assert.equal(res.body.added, 4);
+  assert.deepEqual(res.body.errors, []);
+
+  const state = await request(app).get('/api/state');
+  const items = state.body.items;
+  assert.equal(items.length, 4);
+  assert.deepEqual(
+    items.map((i) => [i.name, i.note]),
+    [
+      ['Chips', null],
+      ['Soda', 'Diet'],
+      ['Plates', 'paper, ~30 people'],
+      ['Forks', null],
+    ]
+  );
+  assert.deepEqual(items.map((i) => i.position), [1, 2, 3, 4]);
+});
+
+test('POST /api/items/bulk reports per-line errors with 1-based line numbers', async () => {
+  const { app } = freshApp();
+  const agent = await setupAndLogin(app);
+  const big = 'x'.repeat(101);
+  const csv = [
+    'Chips',
+    `${big}`,
+    'Soda,Diet',
+    '',
+    `ok,${'y'.repeat(501)}`,
+  ].join('\n');
+  const res = await agent.post('/api/items/bulk').send({ csv });
+  assert.equal(res.status, 200);
+  assert.equal(res.body.added, 2);
+  assert.equal(res.body.errors.length, 2);
+  assert.equal(res.body.errors[0].line, 2);
+  assert.match(res.body.errors[0].error, /name/);
+  assert.equal(res.body.errors[1].line, 5);
+  assert.match(res.body.errors[1].error, /note/);
+
+  const state = await request(app).get('/api/state');
+  assert.equal(state.body.items.length, 2);
+});
+
+test('POST /api/items/bulk rejects non-string csv or oversized payload with 400', async () => {
+  const { app } = freshApp();
+  const agent = await setupAndLogin(app);
+  const a = await agent.post('/api/items/bulk').send({ csv: 12345 });
+  assert.equal(a.status, 400);
+  const b = await agent.post('/api/items/bulk').send({ csv: 'x'.repeat(100001) });
+  assert.equal(b.status, 400);
+});
+
+test('POST /api/items/bulk appends after existing items', async () => {
+  const { app } = freshApp();
+  const agent = await setupAndLogin(app);
+  await agent.post('/api/items').send({ name: 'Existing' });
+  await agent.post('/api/items/bulk').send({ csv: 'A\nB' });
+  const state = await request(app).get('/api/state');
+  assert.deepEqual(
+    state.body.items.map((i) => [i.name, i.position]),
+    [
+      ['Existing', 1],
+      ['A', 2],
+      ['B', 3],
+    ]
+  );
+});
+
 test('GET /api/me returns null name before any name is set', async () => {
   const { app } = freshApp();
   const res = await request(app).get('/api/me');

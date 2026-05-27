@@ -112,6 +112,54 @@ export function mountApi(app, db) {
     res.status(201).json(row);
   });
 
+  const MAX_CSV_LEN = 100000;
+
+  router.post('/items/bulk', requireAdmin(db), (req, res) => {
+    const csv = req.body?.csv;
+    if (typeof csv !== 'string') {
+      return res.status(400).json({ error: 'csv must be a string' });
+    }
+    if (csv.length > MAX_CSV_LEN) {
+      return res.status(400).json({ error: `csv must be at most ${MAX_CSV_LEN} chars` });
+    }
+
+    const rawLines = csv.split('\n');
+    const valid = [];
+    const errors = [];
+
+    rawLines.forEach((raw, idx) => {
+      const lineNo = idx + 1;
+      if (raw.trim().length === 0) return;
+      const comma = raw.indexOf(',');
+      const namePart = comma === -1 ? raw : raw.slice(0, comma);
+      const notePart = comma === -1 ? undefined : raw.slice(comma + 1);
+      const n = validateItemName(namePart);
+      if (!n.ok) { errors.push({ line: lineNo, error: `name: ${n.error}` }); return; }
+      const nt = validateItemNote(notePart);
+      if (!nt.ok) { errors.push({ line: lineNo, error: `note: ${nt.error}` }); return; }
+      valid.push({ name: n.value, note: nt.value });
+    });
+
+    if (valid.length === 0) {
+      return res.json({ added: 0, errors });
+    }
+
+    const insert = db.prepare(
+      'INSERT INTO items (name, note, position, claimed_by, claimed_at) VALUES (?, ?, ?, NULL, NULL)'
+    );
+    const tx = db.transaction((rows) => {
+      let pos =
+        db.prepare('SELECT COALESCE(MAX(position), 0) AS p FROM items').get().p;
+      for (const r of rows) {
+        pos += 1;
+        insert.run(r.name, r.note, pos);
+      }
+    });
+    tx(valid);
+
+    res.json({ added: valid.length, errors });
+  });
+
   router.patch('/items/:id', requireAdmin(db), (req, res) => {
     const id = Number(req.params.id);
     if (!Number.isInteger(id)) return res.status(400).json({ error: 'bad id' });
