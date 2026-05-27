@@ -24,6 +24,15 @@ function el(html) {
   return t.content.firstElementChild;
 }
 
+function flash(el, text, variant = 'error', ms = 3000) {
+  el.textContent = text;
+  el.classList.remove('error', 'success');
+  el.classList.add(variant);
+  el.hidden = false;
+  clearTimeout(el._flashTimer);
+  el._flashTimer = setTimeout(() => { el.hidden = true; }, ms);
+}
+
 function renderSetup() {
   app.innerHTML = '';
   const form = el(`
@@ -54,29 +63,32 @@ function renderSetup() {
   app.appendChild(form);
 }
 
-function itemRow(item, onClaim, onUnclaim) {
+function itemRow(item, currentName, onClaim, onUnclaim) {
   const li = el(`
-    <li>
+    <li class="item">
       <div class="meta">
         <div class="name"></div>
         <div class="note" hidden></div>
       </div>
-      <div class="claim"></div>
+      <div class="actions"></div>
     </li>
   `);
   $('.name', li).textContent = item.name;
   if (item.note) { const n = $('.note', li); n.textContent = item.note; n.hidden = false; }
-  const claim = $('.claim', li);
+  const actions = $('.actions', li);
   if (item.claimed_by) {
-    claim.innerHTML = `Taken by <strong></strong> <button type="button" hidden>Unclaim</button>`;
-    claim.querySelector('strong').textContent = item.claimed_by;
-    const btn = claim.querySelector('button');
-    btn.addEventListener('click', () => onUnclaim(item.id));
-    claim.dataset.claimedBy = item.claimed_by;
+    const chip = el('<span class="chip"></span>');
+    chip.textContent = `Taken by ${item.claimed_by}`;
+    actions.appendChild(chip);
+    if (item.claimed_by === currentName) {
+      const unclaim = el('<button type="button" class="link-quiet">Unclaim</button>');
+      unclaim.addEventListener('click', () => onUnclaim(item.id));
+      actions.appendChild(unclaim);
+    }
   } else {
-    const btn = el('<button type="button">Claim</button>');
+    const btn = el('<button type="button" class="btn btn-primary btn-pill">Claim</button>');
     btn.addEventListener('click', () => onClaim(item.id));
-    claim.appendChild(btn);
+    actions.appendChild(btn);
   }
   return li;
 }
@@ -130,10 +142,10 @@ async function renderGuest() {
 function renderGuestList(currentName) {
   app.innerHTML = '';
   const header = el(`
-    <p class="meta-header">
+    <p class="signed-in">
       Signed in as <strong></strong>
-      · <a href="#" class="signout">Sign out</a>
-      · <a href="/admin">Admin</a>
+      <span class="sep">·</span><a href="#" class="signout">Sign out</a>
+      <span class="sep">·</span><a href="/admin">Admin</a>
     </p>
   `);
   header.querySelector('strong').textContent = currentName;
@@ -143,49 +155,41 @@ function renderGuestList(currentName) {
     renderGuest();
   });
 
-  const h1 = el('<h1>Loading…</h1>');
+  const h1 = el('<h1 class="page-title">Loading…</h1>');
+  const subtitle = el('<p class="subtitle"></p>');
   const list = el('<ul class="items"></ul>');
-  const msg = el('<p class="error" hidden></p>');
-  app.append(header, h1, list, msg);
+  const msg = el('<p class="flash" hidden></p>');
+  app.append(header, h1, subtitle, list, msg);
 
   async function refresh() {
     const r = await fetchJson('/api/state');
     if (r.status !== 200) {
       h1.textContent = 'Error';
-      msg.textContent = r.body?.error ?? `error ${r.status}`;
-      msg.hidden = false;
+      flash(msg, r.body?.error ?? `error ${r.status}`);
       return;
     }
     h1.textContent = r.body.title;
+    const total = r.body.items.length;
+    const claimed = r.body.items.filter((i) => i.claimed_by).length;
+    subtitle.textContent = `${total} item${total === 1 ? '' : 's'} · ${claimed} claimed`;
     list.innerHTML = '';
     for (const it of r.body.items) {
-      const row = itemRow(it, onClaim, onUnclaim);
-      if (it.claimed_by === currentName) {
-        const btn = row.querySelector('.claim button');
-        if (btn) btn.hidden = false;
-      }
-      list.appendChild(row);
+      list.appendChild(itemRow(it, currentName, onClaim, onUnclaim));
     }
   }
 
   async function onClaim(id) {
     const r = await fetchJson(`/api/items/${id}/claim`, { method: 'POST' });
-    if (r.status === 409) flash(`Already claimed by ${r.body?.item?.claimed_by ?? 'someone'}.`);
-    else if (r.status === 401) { flash('Please sign in again.'); renderGuest(); return; }
-    else if (r.status !== 200) flash(r.body?.error ?? `error ${r.status}`);
+    if (r.status === 409) flash(msg, `Already claimed by ${r.body?.item?.claimed_by ?? 'someone'}.`);
+    else if (r.status === 401) { flash(msg, 'Please sign in again.'); renderGuest(); return; }
+    else if (r.status !== 200) flash(msg, r.body?.error ?? `error ${r.status}`);
     refresh();
   }
 
   async function onUnclaim(id) {
     const r = await fetchJson(`/api/items/${id}/unclaim`, { method: 'POST' });
-    if (r.status === 403) flash('That claim is not yours.');
+    if (r.status === 403) flash(msg, 'That claim is not yours.');
     refresh();
-  }
-
-  function flash(text) {
-    msg.textContent = text;
-    msg.hidden = false;
-    setTimeout(() => { msg.hidden = true; }, 3000);
   }
 
   refresh();
