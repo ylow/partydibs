@@ -38,3 +38,37 @@ test('POST /api/setup validates inputs', async () => {
     .send({ title: '', password: 'p' });
   assert.equal(res.status, 400);
 });
+
+test('POST /api/login with correct password sets cookie', async () => {
+  const { app } = freshApp();
+  await request(app).post('/api/setup').send({ title: 'P', password: 'pw' });
+  const res = await request(app).post('/api/login').send({ password: 'pw' });
+  assert.equal(res.status, 200);
+  assert.match(res.headers['set-cookie'].join(';'), /admin_session=[0-9a-f]{64}/);
+});
+
+test('POST /api/login with wrong password returns 401', async () => {
+  const { app } = freshApp();
+  await request(app).post('/api/setup').send({ title: 'P', password: 'pw' });
+  const res = await request(app).post('/api/login').send({ password: 'nope' });
+  assert.equal(res.status, 401);
+  assert.equal(res.headers['set-cookie'], undefined);
+});
+
+test('POST /api/login before setup returns 400', async () => {
+  const { app } = freshApp();
+  const res = await request(app).post('/api/login').send({ password: 'pw' });
+  assert.equal(res.status, 400);
+});
+
+test('POST /api/logout clears cookie and deletes session row', async () => {
+  const { db, app } = freshApp();
+  const agent = request.agent(app);
+  await agent.post('/api/setup').send({ title: 'P', password: 'pw' });
+  const before = db.prepare('SELECT COUNT(*) AS n FROM admin_sessions').get().n;
+  assert.equal(before, 1);
+  const res = await agent.post('/api/logout');
+  assert.equal(res.status, 200);
+  const after = db.prepare('SELECT COUNT(*) AS n FROM admin_sessions').get().n;
+  assert.equal(after, 0);
+});
