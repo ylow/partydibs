@@ -59,3 +59,20 @@ test('GET /admin serves shell HTML when party exists', async () => {
   assert.equal(res.status, 200);
   assert.match(res.text, /<div id="app">/);
 });
+
+test('GET /app.js serves the client script', async () => {
+  const { app } = freshApp();
+  const res = await request(app).get('/app.js');
+  assert.equal(res.status, 200);
+  assert.match(res.headers['content-type'] ?? '', /javascript/);
+  assert.match(res.text, /renderSetup/);
+  assert.match(res.text, /renderGuest/);
+  assert.match(res.text, /renderAdmin/);
+});
+
+test('GET /styles.css serves the stylesheet', async () => {
+  const { app } = freshApp();
+  const res = await request(app).get('/styles.css');
+  assert.equal(res.status, 200);
+  assert.match(res.headers['content-type'] ?? '', /css/);
+});

@@ -136,8 +136,118 @@ async function renderGuest() {
   setInterval(refresh, 5000);
 }
 
-function renderAdmin() {
-  app.textContent = '(admin view — implemented next)';
+async function renderAdmin() {
+  app.innerHTML = '';
+  // Probe an admin endpoint to determine session state: PATCH on a non-existent
+  // id returns 401 if unauthed, 404 if authed.
+  const probe = await fetchJson('/api/items/0', { method: 'PATCH', body: { name: 'x' } });
+  if (probe.status === 401) return renderAdminLogin();
+  return renderAdminList();
+}
+
+function renderAdminLogin() {
+  const form = el(`
+    <form>
+      <h1>Admin login</h1>
+      <div class="row"><input name="password" type="password" placeholder="Admin password" required maxlength="200" /></div>
+      <button type="submit">Log in</button>
+      <p class="error" hidden></p>
+    </form>
+  `);
+  const error = $('.error', form);
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    error.hidden = true;
+    const password = form.elements.password.value;
+    const r = await fetchJson('/api/login', { method: 'POST', body: { password } });
+    if (r.status === 200) { renderAdmin(); return; }
+    error.textContent = r.body?.error ?? `error ${r.status}`;
+    error.hidden = false;
+  });
+  app.appendChild(form);
+}
+
+function adminItemRow(item, refresh) {
+  const li = el(`
+    <li>
+      <div class="meta">
+        <div class="name"></div>
+        <div class="note" hidden></div>
+        <div class="claimed" hidden></div>
+      </div>
+      <div class="claim"></div>
+    </li>
+  `);
+  $('.name', li).textContent = item.name;
+  if (item.note) { const n = $('.note', li); n.textContent = item.note; n.hidden = false; }
+  if (item.claimed_by) {
+    const c = $('.claimed', li);
+    c.textContent = `Taken by ${item.claimed_by}`;
+    c.hidden = false;
+  }
+  const actions = $('.claim', li);
+  const editBtn = el('<button type="button">Edit</button>');
+  const delBtn = el('<button type="button">Delete</button>');
+  editBtn.addEventListener('click', async () => {
+    const name = prompt('Name', item.name);
+    if (name === null) return;
+    const note = prompt('Note (optional)', item.note ?? '') ?? '';
+    const r = await fetchJson(`/api/items/${item.id}`, { method: 'PATCH', body: { name, note } });
+    if (r.status !== 200) alert(r.body?.error ?? `error ${r.status}`);
+    refresh();
+  });
+  delBtn.addEventListener('click', async () => {
+    if (!confirm(`Delete "${item.name}"?`)) return;
+    await fetchJson(`/api/items/${item.id}`, { method: 'DELETE' });
+    refresh();
+  });
+  actions.append(editBtn, delBtn);
+  return li;
+}
+
+async function renderAdminList() {
+  app.innerHTML = '';
+  const h1 = el('<h1>Loading…</h1>');
+  const list = el('<ul class="items"></ul>');
+  const addForm = el(`
+    <form>
+      <h2>Add item</h2>
+      <div class="row"><input name="name" placeholder="Item name" required maxlength="100" /></div>
+      <div class="row"><input name="note" placeholder="Note (optional)" maxlength="500" /></div>
+      <button type="submit">Add</button>
+      <p class="error" hidden></p>
+    </form>
+  `);
+  const addError = $('.error', addForm);
+  const logoutBtn = el('<button type="button">Log out</button>');
+  app.append(h1, list, addForm, logoutBtn);
+
+  async function refresh() {
+    const r = await fetchJson('/api/state');
+    if (r.status !== 200) { h1.textContent = 'Error'; return; }
+    h1.textContent = `${r.body.title} (admin)`;
+    list.innerHTML = '';
+    for (const it of r.body.items) list.appendChild(adminItemRow(it, refresh));
+  }
+
+  addForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    addError.hidden = true;
+    const name = addForm.elements.name.value;
+    const note = addForm.elements.note.value;
+    const r = await fetchJson('/api/items', { method: 'POST', body: { name, note } });
+    if (r.status !== 201) { addError.textContent = r.body?.error ?? `error ${r.status}`; addError.hidden = false; return; }
+    addForm.reset();
+    refresh();
+  });
+
+  logoutBtn.addEventListener('click', async () => {
+    await fetchJson('/api/logout', { method: 'POST' });
+    renderAdmin();
+  });
+
+  await refresh();
+  setInterval(refresh, 5000);
 }
 
 const route = routes[window.location.pathname] ?? renderGuest;
