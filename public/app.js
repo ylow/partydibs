@@ -307,10 +307,31 @@ function adminItemRow(item, refresh, state) {
     li.replaceWith(editRow);
   });
 
-  $('.delete', li).addEventListener('click', async () => {
-    if (!confirm(`Delete "${item.name}"?`)) return;
+  const deleteBtn = $('.delete', li);
+  let deleteTimer = null;
+  const resetDelete = () => {
+    deleteBtn.classList.remove('confirming');
+    deleteBtn.innerHTML = '&#128465;';
+    deleteBtn.title = 'Delete';
+    if (deleteTimer) { clearTimeout(deleteTimer); deleteTimer = null; }
+  };
+  deleteBtn.addEventListener('click', async () => {
+    if (!deleteBtn.classList.contains('confirming')) {
+      deleteBtn.classList.add('confirming');
+      deleteBtn.textContent = 'Delete?';
+      deleteBtn.title = 'Click again to confirm';
+      deleteTimer = setTimeout(resetDelete, 4000);
+      return;
+    }
+    resetDelete();
     await fetchJson(`/api/items/${item.id}`, { method: 'DELETE' });
     refresh();
+  });
+  deleteBtn.addEventListener('mouseenter', () => {
+    if (deleteBtn.classList.contains('confirming') && deleteTimer) {
+      clearTimeout(deleteTimer);
+      deleteTimer = setTimeout(resetDelete, 4000);
+    }
   });
 
   return li;
