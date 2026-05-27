@@ -364,11 +364,13 @@ async function renderAdminList() {
   const addError = $('.flash', addForm);
 
   const bulkForm = el(`
-    <form>
-      <h2>Bulk add (CSV)</h2>
-      <p>One item per line. Optional note after the first comma. Example: <code>Chips, salty</code></p>
+    <form class="form-card">
+      <div class="label">Bulk add (CSV)</div>
+      <p class="helper">One item per line. Optional note after the first comma. Example: <code>Chips, salty</code></p>
       <textarea name="csv" rows="6" maxlength="100000"></textarea>
-      <button type="submit">Add batch</button>
+      <div class="actions">
+        <button type="submit" class="btn btn-primary">Add batch</button>
+      </div>
       <p class="flash" hidden></p>
       <ul class="bulk-errors" hidden></ul>
     </form>
