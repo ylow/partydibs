@@ -50,6 +50,7 @@ function buildInlineEditRow(item, onSave, onCancel) {
   $('.edit-note', li).value = item.note ?? '';
   $('.edit-name', li).focus();
   $('.save', li).addEventListener('click', () => {
+    $('.save', li).disabled = true;
     onSave({ name: $('.edit-name', li).value, note: $('.edit-note', li).value });
   });
   $('.cancel', li).addEventListener('click', onCancel);
@@ -284,6 +285,8 @@ function adminItemRow(item, refresh, state) {
   if (item.note) { const n = $('.note', li); n.textContent = item.note; n.hidden = false; }
 
   $('.edit', li).addEventListener('click', () => {
+    // editingId tracks one row; opening a second pencil overwrites it without
+    // reverting the first. The next refresh() collapses any stale edit rows.
     state.editingId = item.id;
     const editRow = buildInlineEditRow(
       item,
