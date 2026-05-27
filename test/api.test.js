@@ -219,3 +219,54 @@ test('POST /api/items/:id/unclaim clears claimer; idempotent', async () => {
   const second = await request(app).post(`/api/items/${item.id}/unclaim`).send();
   assert.equal(second.status, 200);
 });
+
+test('GET /api/me returns null name before any name is set', async () => {
+  const { app } = freshApp();
+  const res = await request(app).get('/api/me');
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body, { name: null });
+});
+
+test('POST /api/name sets guest_name cookie and returns name', async () => {
+  const { app } = freshApp();
+  const res = await request(app).post('/api/name').send({ name: '  Alice ' });
+  assert.equal(res.status, 200);
+  assert.equal(res.body.name, 'Alice');
+  const setCookie = res.headers['set-cookie'].join(';');
+  assert.match(setCookie, /guest_name=Alice/);
+  assert.match(setCookie, /HttpOnly/i);
+});
+
+test('POST /api/name rejects empty and oversized', async () => {
+  const { app } = freshApp();
+  assert.equal((await request(app).post('/api/name').send({ name: '' })).status, 400);
+  assert.equal(
+    (await request(app).post('/api/name').send({ name: 'x'.repeat(61) })).status,
+    400
+  );
+});
+
+test('GET /api/me returns the name set by POST /api/name', async () => {
+  const { app } = freshApp();
+  const agent = request.agent(app);
+  await agent.post('/api/name').send({ name: 'Alice' });
+  const res = await agent.get('/api/me');
+  assert.equal(res.status, 200);
+  assert.equal(res.body.name, 'Alice');
+});
+
+test('POST /api/name/logout clears the cookie; subsequent /api/me is null', async () => {
+  const { app } = freshApp();
+  const agent = request.agent(app);
+  await agent.post('/api/name').send({ name: 'Alice' });
+  const out = await agent.post('/api/name/logout');
+  assert.equal(out.status, 200);
+  const me = await agent.get('/api/me');
+  assert.equal(me.body.name, null);
+});
+
+test('POST /api/name/logout is idempotent', async () => {
+  const { app } = freshApp();
+  const res = await request(app).post('/api/name/logout');
+  assert.equal(res.status, 200);
+});

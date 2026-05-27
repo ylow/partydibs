@@ -15,6 +15,7 @@ import {
 } from '../auth.js';
 
 const COOKIE_NAME = 'admin_session';
+const GUEST_COOKIE = 'guest_name';
 const COOKIE_OPTS = { httpOnly: true, sameSite: 'lax', path: '/' };
 
 function partyExists(db) {
@@ -64,6 +65,23 @@ export function mountApi(app, db) {
   router.post('/logout', requireAdmin(db), (req, res) => {
     deleteSession(db, req.adminToken);
     res.clearCookie(COOKIE_NAME, COOKIE_OPTS);
+    res.json({ ok: true });
+  });
+
+  router.get('/me', (req, res) => {
+    const name = req.cookies?.[GUEST_COOKIE] ?? null;
+    res.json({ name });
+  });
+
+  router.post('/name', (req, res) => {
+    const n = validateClaimerName(req.body?.name);
+    if (!n.ok) return res.status(400).json({ error: `name: ${n.error}` });
+    res.cookie(GUEST_COOKIE, n.value, COOKIE_OPTS);
+    res.json({ name: n.value });
+  });
+
+  router.post('/name/logout', (req, res) => {
+    res.clearCookie(GUEST_COOKIE, COOKIE_OPTS);
     res.json({ ok: true });
   });
 
