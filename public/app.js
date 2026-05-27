@@ -33,6 +33,29 @@ function flash(target, text, variant = 'error', ms = 3000) {
   target._flashTimer = setTimeout(() => { target.hidden = true; }, ms);
 }
 
+function buildInlineEditRow(item, onSave, onCancel) {
+  const li = el(`
+    <li class="item editing">
+      <div class="edit-fields">
+        <input class="edit-name" maxlength="100" />
+        <input class="edit-note" placeholder="Note (optional)" maxlength="500" />
+      </div>
+      <div class="edit-actions">
+        <button type="button" class="btn btn-primary btn-pill save">Save</button>
+        <button type="button" class="btn btn-secondary btn-pill cancel" title="Cancel" aria-label="Cancel">×</button>
+      </div>
+    </li>
+  `);
+  $('.edit-name', li).value = item.name;
+  $('.edit-note', li).value = item.note ?? '';
+  $('.edit-name', li).focus();
+  $('.save', li).addEventListener('click', () => {
+    onSave({ name: $('.edit-name', li).value, note: $('.edit-note', li).value });
+  });
+  $('.cancel', li).addEventListener('click', onCancel);
+  return li;
+}
+
 function renderSetup() {
   app.innerHTML = '';
   const form = el(`
@@ -236,7 +259,7 @@ async function renderAdminLogin() {
   app.appendChild(form);
 }
 
-function adminItemRow(item, refresh) {
+function adminItemRow(item, refresh, state) {
   const li = el(`
     <li class="item">
       <div class="meta">
@@ -260,14 +283,27 @@ function adminItemRow(item, refresh) {
   }
   if (item.note) { const n = $('.note', li); n.textContent = item.note; n.hidden = false; }
 
-  $('.edit', li).addEventListener('click', async () => {
-    const name = prompt('Name', item.name);
-    if (name === null) return;
-    const note = prompt('Note (optional)', item.note ?? '') ?? '';
-    const r = await fetchJson(`/api/items/${item.id}`, { method: 'PATCH', body: { name, note } });
-    if (r.status !== 200) alert(r.body?.error ?? `error ${r.status}`);
-    refresh();
+  $('.edit', li).addEventListener('click', () => {
+    state.editingId = item.id;
+    const editRow = buildInlineEditRow(
+      item,
+      async ({ name, note }) => {
+        const r = await fetchJson(`/api/items/${item.id}`, { method: 'PATCH', body: { name, note } });
+        if (r.status !== 200) {
+          alert(r.body?.error ?? `error ${r.status}`);
+          return;
+        }
+        state.editingId = null;
+        refresh();
+      },
+      () => {
+        state.editingId = null;
+        refresh();
+      },
+    );
+    li.replaceWith(editRow);
   });
+
   $('.delete', li).addEventListener('click', async () => {
     if (!confirm(`Delete "${item.name}"?`)) return;
     await fetchJson(`/api/items/${item.id}`, { method: 'DELETE' });
@@ -328,7 +364,7 @@ async function renderAdminList() {
     const claimed = r.body.items.filter((i) => i.claimed_by).length;
     subtitle.textContent = `${total} item${total === 1 ? '' : 's'} · ${claimed} claimed`;
     list.innerHTML = '';
-    for (const it of r.body.items) list.appendChild(adminItemRow(it, refresh));
+    for (const it of r.body.items) list.appendChild(adminItemRow(it, refresh, state));
   }
 
   addForm.addEventListener('submit', async (e) => {
@@ -377,8 +413,9 @@ async function renderAdminList() {
     renderAdmin();
   });
 
+  const state = { editingId: null };
   await refresh();
-  setInterval(refresh, 5000);
+  setInterval(() => { if (state.editingId === null) refresh(); }, 5000);
 }
 
 const route = routes[window.location.pathname] ?? renderGuest;
