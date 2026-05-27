@@ -21,10 +21,11 @@ export function buildApp(db) {
 const isMain = import.meta.url === `file://${process.argv[1]}`;
 if (isMain) {
   const port = Number(process.env.PORT) || 3000;
+  const host = process.env.HOST || '127.0.0.1';
   const dbPath = process.env.DB_PATH || './data/party.db';
   const db = openDb(dbPath);
   const app = buildApp(db);
-  app.listen(port, () => {
-    console.log(`PartyDibs listening on http://localhost:${port}`);
+  app.listen(port, host, () => {
+    console.log(`PartyDibs listening on http://${host}:${port}`);
   });
 }

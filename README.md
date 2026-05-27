@@ -10,7 +10,9 @@ npm install
 npm start
 ```
 
-Defaults to `http://localhost:3000`. Override with `PORT=4000 npm start`.
+Defaults to `http://127.0.0.1:3000` (localhost only — not reachable from other
+devices). Override port with `PORT=4000 npm start`. To expose on the LAN so
+phones / other laptops can reach it, set `HOST=0.0.0.0 npm start`.
 
 On first launch the home page redirects to `/setup` where you pick a party
 title and admin password. After setup, share `http://localhost:3000/` with
