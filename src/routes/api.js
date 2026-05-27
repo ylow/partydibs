@@ -144,8 +144,10 @@ export function mountApi(app, db) {
   router.post('/items/:id/claim', (req, res) => {
     const id = Number(req.params.id);
     if (!Number.isInteger(id)) return res.status(400).json({ error: 'bad id' });
-    const n = validateClaimerName(req.body?.name);
-    if (!n.ok) return res.status(400).json({ error: `name: ${n.error}` });
+    const guestName = req.cookies?.[GUEST_COOKIE];
+    if (typeof guestName !== 'string' || guestName.length === 0) {
+      return res.status(401).json({ error: 'name required' });
+    }
     const existing = db.prepare('SELECT * FROM items WHERE id = ?').get(id);
     if (!existing) return res.status(404).json({ error: 'not found' });
     const info = db
@@ -153,7 +155,7 @@ export function mountApi(app, db) {
         `UPDATE items SET claimed_by = ?, claimed_at = ?
          WHERE id = ? AND claimed_by IS NULL`
       )
-      .run(n.value, Math.floor(Date.now() / 1000), id);
+      .run(guestName, Math.floor(Date.now() / 1000), id);
     if (info.changes === 0) {
       const current = db.prepare('SELECT * FROM items WHERE id = ?').get(id);
       return res.status(409).json({ error: 'already claimed', item: current });
