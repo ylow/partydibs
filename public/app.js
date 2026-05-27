@@ -24,13 +24,13 @@ function el(html) {
   return t.content.firstElementChild;
 }
 
-function flash(el, text, variant = 'error', ms = 3000) {
-  el.textContent = text;
-  el.classList.remove('error', 'success');
-  el.classList.add(variant);
-  el.hidden = false;
-  clearTimeout(el._flashTimer);
-  el._flashTimer = setTimeout(() => { el.hidden = true; }, ms);
+function flash(target, text, variant = 'error', ms = 3000) {
+  target.textContent = text;
+  target.classList.remove('error', 'success');
+  target.classList.add(variant);
+  target.hidden = false;
+  clearTimeout(target._flashTimer);
+  target._flashTimer = setTimeout(() => { target.hidden = true; }, ms);
 }
 
 function renderSetup() {
