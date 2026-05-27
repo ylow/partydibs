@@ -169,3 +169,53 @@ test('DELETE /api/items/:id requires admin', async () => {
   const res = await request(app).delete(`/api/items/${created.id}`); // no cookie
   assert.equal(res.status, 401);
 });
+
+test('POST /api/items/:id/claim claims a free item', async () => {
+  const { app } = freshApp();
+  const agent = await setupAndLogin(app);
+  const item = (await agent.post('/api/items').send({ name: 'Chips' })).body;
+  const res = await request(app)
+    .post(`/api/items/${item.id}/claim`)
+    .send({ name: 'Alice' });
+  assert.equal(res.status, 200);
+  assert.equal(res.body.claimed_by, 'Alice');
+});
+
+test('POST /api/items/:id/claim on already-claimed returns 409 with current state', async () => {
+  const { app } = freshApp();
+  const agent = await setupAndLogin(app);
+  const item = (await agent.post('/api/items').send({ name: 'Chips' })).body;
+  await request(app).post(`/api/items/${item.id}/claim`).send({ name: 'Alice' });
+  const res = await request(app)
+    .post(`/api/items/${item.id}/claim`)
+    .send({ name: 'Bob' });
+  assert.equal(res.status, 409);
+  assert.equal(res.body.item.claimed_by, 'Alice');
+});
+
+test('POST /api/items/:id/claim rejects bad name with 400', async () => {
+  const { app } = freshApp();
+  const agent = await setupAndLogin(app);
+  const item = (await agent.post('/api/items').send({ name: 'Chips' })).body;
+  const res = await request(app).post(`/api/items/${item.id}/claim`).send({ name: '' });
+  assert.equal(res.status, 400);
+});
+
+test('POST /api/items/:id/claim returns 404 for unknown id', async () => {
+  const { app } = freshApp();
+  await request(app).post('/api/setup').send({ title: 'P', password: 'pw' });
+  const res = await request(app).post('/api/items/999/claim').send({ name: 'Alice' });
+  assert.equal(res.status, 404);
+});
+
+test('POST /api/items/:id/unclaim clears claimer; idempotent', async () => {
+  const { app } = freshApp();
+  const agent = await setupAndLogin(app);
+  const item = (await agent.post('/api/items').send({ name: 'Chips' })).body;
+  await request(app).post(`/api/items/${item.id}/claim`).send({ name: 'Alice' });
+  const first = await request(app).post(`/api/items/${item.id}/unclaim`).send();
+  assert.equal(first.status, 200);
+  assert.equal(first.body.claimed_by, null);
+  const second = await request(app).post(`/api/items/${item.id}/unclaim`).send();
+  assert.equal(second.status, 200);
+});
