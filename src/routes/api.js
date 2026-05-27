@@ -168,6 +168,12 @@ export function mountApi(app, db) {
     if (!Number.isInteger(id)) return res.status(400).json({ error: 'bad id' });
     const existing = db.prepare('SELECT * FROM items WHERE id = ?').get(id);
     if (!existing) return res.status(404).json({ error: 'not found' });
+    const guestName = req.cookies?.[GUEST_COOKIE] ?? null;
+    const isAdmin = lookupSession(db, req.cookies?.[COOKIE_NAME]);
+    if (existing.claimed_by === null) return res.json(existing);
+    if (!isAdmin && existing.claimed_by !== guestName) {
+      return res.status(403).json({ error: 'not your claim' });
+    }
     db.prepare(
       'UPDATE items SET claimed_by = NULL, claimed_at = NULL WHERE id = ?'
     ).run(id);

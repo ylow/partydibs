@@ -227,6 +227,57 @@ test('POST /api/items/:id/unclaim by the claimer clears it; idempotent for same 
   assert.equal(second.status, 200);
 });
 
+test('POST /api/items/:id/unclaim with mismatched name returns 403; original claim stays', async () => {
+  const { app } = freshApp();
+  const adminAgent = await setupAndLogin(app);
+  const item = (await adminAgent.post('/api/items').send({ name: 'Chips' })).body;
+  const alice = await guestAgent(app, 'Alice');
+  await alice.post(`/api/items/${item.id}/claim`);
+  const bob = await guestAgent(app, 'Bob');
+  const res = await bob.post(`/api/items/${item.id}/unclaim`);
+  assert.equal(res.status, 403);
+  const state = await request(app).get('/api/state');
+  assert.equal(state.body.items[0].claimed_by, 'Alice');
+});
+
+test('POST /api/items/:id/unclaim with no name cookie at all returns 403', async () => {
+  const { app } = freshApp();
+  const adminAgent = await setupAndLogin(app);
+  const item = (await adminAgent.post('/api/items').send({ name: 'Chips' })).body;
+  const alice = await guestAgent(app, 'Alice');
+  await alice.post(`/api/items/${item.id}/claim`);
+  const res = await request(app).post(`/api/items/${item.id}/unclaim`);
+  assert.equal(res.status, 403);
+});
+
+test('admin can unclaim someone else\'s claim (override)', async () => {
+  const { app } = freshApp();
+  const adminAgent = await setupAndLogin(app);
+  const item = (await adminAgent.post('/api/items').send({ name: 'Chips' })).body;
+  const alice = await guestAgent(app, 'Alice');
+  await alice.post(`/api/items/${item.id}/claim`);
+  const res = await adminAgent.post(`/api/items/${item.id}/unclaim`);
+  assert.equal(res.status, 200);
+  assert.equal(res.body.claimed_by, null);
+});
+
+test('unclaim of an unclaimed item by any guest is an idempotent no-op (200)', async () => {
+  const { app } = freshApp();
+  const adminAgent = await setupAndLogin(app);
+  const item = (await adminAgent.post('/api/items').send({ name: 'Chips' })).body;
+  const bob = await guestAgent(app, 'Bob');
+  const res = await bob.post(`/api/items/${item.id}/unclaim`);
+  assert.equal(res.status, 200);
+});
+
+test('unclaim returns 404 for unknown id', async () => {
+  const { app } = freshApp();
+  await request(app).post('/api/setup').send({ title: 'P', password: 'pw' });
+  const alice = await guestAgent(app, 'Alice');
+  const res = await alice.post('/api/items/999/unclaim');
+  assert.equal(res.status, 404);
+});
+
 test('GET /api/me returns null name before any name is set', async () => {
   const { app } = freshApp();
   const res = await request(app).get('/api/me');
