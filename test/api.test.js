@@ -72,3 +72,18 @@ test('POST /api/logout clears cookie and deletes session row', async () => {
   const after = db.prepare('SELECT COUNT(*) AS n FROM admin_sessions').get().n;
   assert.equal(after, 0);
 });
+
+test('GET /api/state before setup returns 400', async () => {
+  const { app } = freshApp();
+  const res = await request(app).get('/api/state');
+  assert.equal(res.status, 400);
+});
+
+test('GET /api/state returns title and empty items after setup', async () => {
+  const { app } = freshApp();
+  await request(app).post('/api/setup').send({ title: 'Mine', password: 'pw' });
+  const res = await request(app).get('/api/state');
+  assert.equal(res.status, 200);
+  assert.equal(res.body.title, 'Mine');
+  assert.deepEqual(res.body.items, []);
+});

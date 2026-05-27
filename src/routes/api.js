@@ -61,6 +61,17 @@ export function mountApi(app, db) {
     res.json({ ok: true });
   });
 
+  router.get('/state', (req, res) => {
+    const party = db.prepare('SELECT title FROM party WHERE id = 1').get();
+    if (!party) return res.status(400).json({ error: 'not set up' });
+    const items = db
+      .prepare(
+        'SELECT id, name, note, position, claimed_by, claimed_at FROM items ORDER BY position, id'
+      )
+      .all();
+    res.json({ title: party.title, items });
+  });
+
   app.use('/api', router);
   return router;
 }
