@@ -50,11 +50,6 @@ function renderSetup() {
   app.appendChild(form);
 }
 
-const NAME_KEY = 'partydibs.name';
-
-function getStoredName() { return localStorage.getItem(NAME_KEY) ?? ''; }
-function setStoredName(v) { localStorage.setItem(NAME_KEY, v); }
-
 function itemRow(item, onClaim, onUnclaim) {
   const li = el(`
     <li>
@@ -69,9 +64,11 @@ function itemRow(item, onClaim, onUnclaim) {
   if (item.note) { const n = $('.note', li); n.textContent = item.note; n.hidden = false; }
   const claim = $('.claim', li);
   if (item.claimed_by) {
-    claim.innerHTML = `Taken by <strong></strong> — <button type="button">Unclaim</button>`;
+    claim.innerHTML = `Taken by <strong></strong> <button type="button" hidden>Unclaim</button>`;
     claim.querySelector('strong').textContent = item.claimed_by;
-    claim.querySelector('button').addEventListener('click', () => onUnclaim(item.id));
+    const btn = claim.querySelector('button');
+    btn.addEventListener('click', () => onUnclaim(item.id));
+    claim.dataset.claimedBy = item.claimed_by;
   } else {
     const btn = el('<button type="button">Claim</button>');
     btn.addEventListener('click', () => onClaim(item.id));
@@ -80,21 +77,64 @@ function itemRow(item, onClaim, onUnclaim) {
   return li;
 }
 
+function renderNamePrompt(onName) {
+  app.innerHTML = '';
+  const form = el(`
+    <form>
+      <h1>Who are you?</h1>
+      <p>Type a display name to claim items. Anyone who picks something up will see this name.</p>
+      <div class="row"><input name="name" placeholder="Your name" required maxlength="60" autofocus /></div>
+      <button type="submit">Continue</button>
+      <p class="error" hidden></p>
+    </form>
+  `);
+  const error = $('.error', form);
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    error.hidden = true;
+    const name = form.elements.name.value;
+    const r = await fetchJson('/api/name', { method: 'POST', body: { name } });
+    if (r.status !== 200) {
+      error.textContent = r.body?.error ?? `error ${r.status}`;
+      error.hidden = false;
+      return;
+    }
+    onName(r.body.name);
+  });
+  app.appendChild(form);
+}
+
 async function renderGuest() {
   app.innerHTML = '';
-  const h1 = el('<h1>Loading…</h1>');
-  const nameRow = el(`
-    <div class="row">
-      <input name="name" placeholder="Your name" maxlength="60" />
-    </div>
-  `);
-  const nameInput = nameRow.querySelector('input[name="name"]');
-  nameInput.value = getStoredName();
-  nameInput.addEventListener('input', () => setStoredName(nameInput.value));
+  const me = await fetchJson('/api/me');
+  const currentName = me.body?.name ?? null;
+  if (currentName === null) {
+    renderNamePrompt(() => renderGuest());
+    return;
+  }
+  renderGuestList(currentName);
+}
 
+function renderGuestList(currentName) {
+  app.innerHTML = '';
+  const header = el(`
+    <p class="meta-header">
+      Signed in as <strong></strong>
+      · <a href="#" class="signout">Sign out</a>
+      · <a href="/admin">Admin</a>
+    </p>
+  `);
+  header.querySelector('strong').textContent = currentName;
+  header.querySelector('.signout').addEventListener('click', async (e) => {
+    e.preventDefault();
+    await fetchJson('/api/name/logout', { method: 'POST' });
+    renderGuest();
+  });
+
+  const h1 = el('<h1>Loading…</h1>');
   const list = el('<ul class="items"></ul>');
   const msg = el('<p class="error" hidden></p>');
-  app.append(h1, nameRow, list, msg);
+  app.append(header, h1, list, msg);
 
   async function refresh() {
     const r = await fetchJson('/api/state');
@@ -107,22 +147,26 @@ async function renderGuest() {
     h1.textContent = r.body.title;
     list.innerHTML = '';
     for (const it of r.body.items) {
-      list.appendChild(itemRow(it, onClaim, onUnclaim));
+      const row = itemRow(it, onClaim, onUnclaim);
+      if (it.claimed_by === currentName) {
+        const btn = row.querySelector('.claim button');
+        if (btn) btn.hidden = false;
+      }
+      list.appendChild(row);
     }
   }
 
   async function onClaim(id) {
-    const name = nameInput.value.trim();
-    if (!name) { flash('Type your name first.'); return; }
-    setStoredName(name);
-    const r = await fetchJson(`/api/items/${id}/claim`, { method: 'POST', body: { name } });
+    const r = await fetchJson(`/api/items/${id}/claim`, { method: 'POST' });
     if (r.status === 409) flash(`Already claimed by ${r.body?.item?.claimed_by ?? 'someone'}.`);
+    else if (r.status === 401) { flash('Please sign in again.'); renderGuest(); return; }
     else if (r.status !== 200) flash(r.body?.error ?? `error ${r.status}`);
     refresh();
   }
 
   async function onUnclaim(id) {
-    await fetchJson(`/api/items/${id}/unclaim`, { method: 'POST' });
+    const r = await fetchJson(`/api/items/${id}/unclaim`, { method: 'POST' });
+    if (r.status === 403) flash('That claim is not yours.');
     refresh();
   }
 
@@ -132,7 +176,7 @@ async function renderGuest() {
     setTimeout(() => { msg.hidden = true; }, 3000);
   }
 
-  await refresh();
+  refresh();
   setInterval(refresh, 5000);
 }
 

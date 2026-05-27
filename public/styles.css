@@ -12,3 +12,5 @@ button { cursor: pointer; }
 .msg { color: #060; }
 .row { display: flex; gap: 0.5rem; margin: 0.5rem 0; }
 .row input { flex: 1; }
+.meta-header { color: #555; font-size: 0.95em; margin-bottom: 1rem; }
+.meta-header a { color: #333; }
