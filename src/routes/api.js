@@ -1,5 +1,11 @@
 import express from 'express';
-import { validateTitle, validatePassword } from '../validate.js';
+import {
+  validateTitle,
+  validatePassword,
+  validateItemName,
+  validateItemNote,
+  validateClaimerName,
+} from '../validate.js';
 import {
   hashPassword,
   verifyPassword,
@@ -70,6 +76,51 @@ export function mountApi(app, db) {
       )
       .all();
     res.json({ title: party.title, items });
+  });
+
+  router.post('/items', requireAdmin(db), (req, res) => {
+    const n = validateItemName(req.body?.name);
+    if (!n.ok) return res.status(400).json({ error: `name: ${n.error}` });
+    const note = validateItemNote(req.body?.note);
+    if (!note.ok) return res.status(400).json({ error: `note: ${note.error}` });
+    const nextPos =
+      db.prepare('SELECT COALESCE(MAX(position), 0) + 1 AS p FROM items').get().p;
+    const info = db
+      .prepare(
+        'INSERT INTO items (name, note, position, claimed_by, claimed_at) VALUES (?, ?, ?, NULL, NULL)'
+      )
+      .run(n.value, note.value, nextPos);
+    const row = db.prepare('SELECT * FROM items WHERE id = ?').get(info.lastInsertRowid);
+    res.status(201).json(row);
+  });
+
+  router.patch('/items/:id', requireAdmin(db), (req, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return res.status(400).json({ error: 'bad id' });
+    const existing = db.prepare('SELECT * FROM items WHERE id = ?').get(id);
+    if (!existing) return res.status(404).json({ error: 'not found' });
+
+    let name = existing.name;
+    let note = existing.note;
+    if (req.body?.name !== undefined) {
+      const n = validateItemName(req.body.name);
+      if (!n.ok) return res.status(400).json({ error: `name: ${n.error}` });
+      name = n.value;
+    }
+    if (req.body?.note !== undefined) {
+      const nv = validateItemNote(req.body.note);
+      if (!nv.ok) return res.status(400).json({ error: `note: ${nv.error}` });
+      note = nv.value;
+    }
+    db.prepare('UPDATE items SET name = ?, note = ? WHERE id = ?').run(name, note, id);
+    res.json(db.prepare('SELECT * FROM items WHERE id = ?').get(id));
+  });
+
+  router.delete('/items/:id', requireAdmin(db), (req, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return res.status(400).json({ error: 'bad id' });
+    db.prepare('DELETE FROM items WHERE id = ?').run(id);
+    res.status(204).end();
   });
 
   app.use('/api', router);
