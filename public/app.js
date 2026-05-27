@@ -356,7 +356,7 @@ async function renderAdminList() {
       <div class="row">
         <input name="name" placeholder="Item name" required maxlength="100" />
         <input name="note" placeholder="Note (optional)" maxlength="500" />
-        <button type="submit" class="btn btn-primary">Add</button>
+        <button type="submit" class="btn btn-primary btn-block">Add</button>
       </div>
       <p class="flash error" hidden></p>
     </form>
