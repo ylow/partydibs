@@ -263,8 +263,22 @@ async function renderAdminList() {
     </form>
   `);
   const addError = $('.error', addForm);
+
+  const bulkForm = el(`
+    <form>
+      <h2>Bulk add (CSV)</h2>
+      <p>One item per line. Optional note after the first comma. Example: <code>Chips, salty</code></p>
+      <textarea name="csv" rows="6" maxlength="100000" style="width:100%;font:inherit;"></textarea>
+      <button type="submit">Add batch</button>
+      <p class="msg" hidden></p>
+      <ul class="bulk-errors" hidden></ul>
+    </form>
+  `);
+  const bulkMsg = $('.msg', bulkForm);
+  const bulkErrors = $('.bulk-errors', bulkForm);
+
   const logoutBtn = el('<button type="button">Log out</button>');
-  app.append(h1, list, addForm, logoutBtn);
+  app.append(h1, list, addForm, bulkForm, logoutBtn);
 
   async function refresh() {
     const r = await fetchJson('/api/state');
@@ -283,6 +297,36 @@ async function renderAdminList() {
     if (r.status !== 201) { addError.textContent = r.body?.error ?? `error ${r.status}`; addError.hidden = false; return; }
     addForm.reset();
     refresh();
+  });
+
+  bulkForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    bulkMsg.hidden = true;
+    bulkErrors.hidden = true;
+    bulkErrors.innerHTML = '';
+    const csv = bulkForm.elements.csv.value;
+    const r = await fetchJson('/api/items/bulk', { method: 'POST', body: { csv } });
+    if (r.status !== 200) {
+      bulkMsg.textContent = r.body?.error ?? `error ${r.status}`;
+      bulkMsg.className = 'error';
+      bulkMsg.hidden = false;
+      return;
+    }
+    bulkMsg.textContent = `Added ${r.body.added} item(s).`;
+    bulkMsg.className = 'msg';
+    bulkMsg.hidden = false;
+    if (r.body.errors?.length) {
+      for (const err of r.body.errors) {
+        const li = document.createElement('li');
+        li.textContent = `line ${err.line}: ${err.error}`;
+        bulkErrors.appendChild(li);
+      }
+      bulkErrors.hidden = false;
+    }
+    if (r.body.added > 0) {
+      bulkForm.elements.csv.value = '';
+      refresh();
+    }
   });
 
   logoutBtn.addEventListener('click', async () => {

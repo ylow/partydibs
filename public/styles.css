@@ -14,3 +14,4 @@ button { cursor: pointer; }
 .row input { flex: 1; }
 .meta-header { color: #555; font-size: 0.95em; margin-bottom: 1rem; }
 .meta-header a { color: #333; }
+ul.bulk-errors { color: #b00; font-size: 0.9em; padding-left: 1.25rem; }
