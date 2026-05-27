@@ -238,26 +238,29 @@ async function renderAdminLogin() {
 
 function adminItemRow(item, refresh) {
   const li = el(`
-    <li>
+    <li class="item">
       <div class="meta">
-        <div class="name"></div>
+        <div class="name-row"></div>
         <div class="note" hidden></div>
-        <div class="claimed" hidden></div>
       </div>
-      <div class="claim"></div>
+      <div class="actions">
+        <button type="button" class="icon-btn edit" title="Edit" aria-label="Edit">&#9998;</button>
+        <button type="button" class="icon-btn delete" title="Delete" aria-label="Delete">&#128465;</button>
+      </div>
     </li>
   `);
-  $('.name', li).textContent = item.name;
-  if (item.note) { const n = $('.note', li); n.textContent = item.note; n.hidden = false; }
+  const nameRow = $('.name-row', li);
+  const nameSpan = el('<span class="name"></span>');
+  nameSpan.textContent = item.name;
+  nameRow.appendChild(nameSpan);
   if (item.claimed_by) {
-    const c = $('.claimed', li);
-    c.textContent = `Taken by ${item.claimed_by}`;
-    c.hidden = false;
+    const chip = el('<span class="chip chip-inline"></span>');
+    chip.textContent = item.claimed_by;
+    nameRow.appendChild(chip);
   }
-  const actions = $('.claim', li);
-  const editBtn = el('<button type="button">Edit</button>');
-  const delBtn = el('<button type="button">Delete</button>');
-  editBtn.addEventListener('click', async () => {
+  if (item.note) { const n = $('.note', li); n.textContent = item.note; n.hidden = false; }
+
+  $('.edit', li).addEventListener('click', async () => {
     const name = prompt('Name', item.name);
     if (name === null) return;
     const note = prompt('Note (optional)', item.note ?? '') ?? '';
@@ -265,50 +268,65 @@ function adminItemRow(item, refresh) {
     if (r.status !== 200) alert(r.body?.error ?? `error ${r.status}`);
     refresh();
   });
-  delBtn.addEventListener('click', async () => {
+  $('.delete', li).addEventListener('click', async () => {
     if (!confirm(`Delete "${item.name}"?`)) return;
     await fetchJson(`/api/items/${item.id}`, { method: 'DELETE' });
     refresh();
   });
-  actions.append(editBtn, delBtn);
+
   return li;
 }
 
 async function renderAdminList() {
   app.innerHTML = '';
-  const h1 = el('<h1>Loading…</h1>');
+  const titleRow = el(`
+    <div class="title-row">
+      <h1 class="page-title">Loading…</h1>
+      <span class="badge">Admin</span>
+    </div>
+  `);
+  const h1 = $('.page-title', titleRow);
+  const subtitle = el('<p class="subtitle"></p>');
   const list = el('<ul class="items"></ul>');
+
+  // Keep the existing add/bulk markup for now — restyled in tasks 10 and 11.
   const addForm = el(`
     <form>
       <h2>Add item</h2>
       <div class="row"><input name="name" placeholder="Item name" required maxlength="100" /></div>
       <div class="row"><input name="note" placeholder="Note (optional)" maxlength="500" /></div>
       <button type="submit">Add</button>
-      <p class="error" hidden></p>
+      <p class="flash error" hidden></p>
     </form>
   `);
-  const addError = $('.error', addForm);
+  const addError = $('.flash', addForm);
 
   const bulkForm = el(`
     <form>
       <h2>Bulk add (CSV)</h2>
       <p>One item per line. Optional note after the first comma. Example: <code>Chips, salty</code></p>
-      <textarea name="csv" rows="6" maxlength="100000" style="width:100%;font:inherit;"></textarea>
+      <textarea name="csv" rows="6" maxlength="100000"></textarea>
       <button type="submit">Add batch</button>
-      <p class="msg" hidden></p>
+      <p class="flash" hidden></p>
       <ul class="bulk-errors" hidden></ul>
     </form>
   `);
-  const bulkMsg = $('.msg', bulkForm);
+  const bulkMsg = $('.flash', bulkForm);
   const bulkErrors = $('.bulk-errors', bulkForm);
 
-  const logoutBtn = el('<button type="button">Log out</button>');
-  app.append(h1, list, addForm, bulkForm, logoutBtn);
+  const logoutBtn = el('<button type="button" class="link-quiet">Log out</button>');
+  const footer = el('<div class="footer-actions"></div>');
+  footer.appendChild(logoutBtn);
+
+  app.append(titleRow, subtitle, list, addForm, bulkForm, footer);
 
   async function refresh() {
     const r = await fetchJson('/api/state');
     if (r.status !== 200) { h1.textContent = 'Error'; return; }
-    h1.textContent = `${r.body.title} (admin)`;
+    h1.textContent = r.body.title;
+    const total = r.body.items.length;
+    const claimed = r.body.items.filter((i) => i.claimed_by).length;
+    subtitle.textContent = `${total} item${total === 1 ? '' : 's'} · ${claimed} claimed`;
     list.innerHTML = '';
     for (const it of r.body.items) list.appendChild(adminItemRow(it, refresh));
   }
@@ -333,12 +351,12 @@ async function renderAdminList() {
     const r = await fetchJson('/api/items/bulk', { method: 'POST', body: { csv } });
     if (r.status !== 200) {
       bulkMsg.textContent = r.body?.error ?? `error ${r.status}`;
-      bulkMsg.className = 'error';
+      bulkMsg.className = 'flash error';
       bulkMsg.hidden = false;
       return;
     }
     bulkMsg.textContent = `Added ${r.body.added} item(s).`;
-    bulkMsg.className = 'msg';
+    bulkMsg.className = 'flash success';
     bulkMsg.hidden = false;
     if (r.body.errors?.length) {
       for (const err of r.body.errors) {
