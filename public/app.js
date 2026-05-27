@@ -77,17 +77,21 @@ function itemRow(item, onClaim, onUnclaim) {
   return li;
 }
 
-function renderNamePrompt(onName) {
+async function renderNamePrompt(onName) {
   app.innerHTML = '';
+  const state = await fetchJson('/api/state');
+  const title = state.body?.title ?? 'PartyDibs';
   const form = el(`
     <form>
-      <h1>Who are you?</h1>
+      <h1></h1>
+      <h2>Who are you?</h2>
       <p>Type a display name to claim items. Anyone who picks something up will see this name.</p>
       <div class="row"><input name="name" placeholder="Your name" required maxlength="60" autofocus /></div>
       <button type="submit">Continue</button>
       <p class="error" hidden></p>
     </form>
   `);
+  form.querySelector('h1').textContent = title;
   const error = $('.error', form);
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
