@@ -27,16 +27,20 @@ function el(html) {
 function renderSetup() {
   app.innerHTML = '';
   const form = el(`
-    <form>
-      <h1>Set up your party</h1>
+    <form class="hero">
+      <h1 class="hero-title">Set up your party</h1>
       <p>Pick a title and an admin password. The password lets you add and edit items later.</p>
-      <div class="row"><input name="title" placeholder="Party title" required maxlength="100" /></div>
-      <div class="row"><input name="password" type="password" placeholder="Admin password" required maxlength="200" /></div>
-      <button type="submit">Create party</button>
-      <p class="error" hidden></p>
+      <div class="field-stack">
+        <input name="title" placeholder="Party title" required maxlength="100" />
+        <input name="password" type="password" placeholder="Admin password" required maxlength="200" />
+      </div>
+      <div class="field-stack">
+        <button type="submit" class="btn btn-primary btn-block">Create party</button>
+      </div>
+      <p class="flash error" hidden></p>
     </form>
   `);
-  const error = $('.error', form);
+  const error = $('.flash', form);
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     error.hidden = true;
