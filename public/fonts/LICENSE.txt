@@ -1,0 +1,16 @@
+The fonts in this directory are distributed under the SIL Open Font License,
+Version 1.1.
+
+  Fraunces — Copyright 2020 The Fraunces Project Authors
+    (https://github.com/undercase/Fraunces)
+
+  Inter — Copyright 2020 The Inter Project Authors
+    (https://github.com/rsms/inter)
+
+The full license text is available at:
+  https://openfontlicense.org/
+
+Summary:
+  • Free to use, study, modify, and redistribute (including in commercial products).
+  • Modified versions cannot use the original Reserved Font Names.
+  • These fonts may not be sold by themselves.
