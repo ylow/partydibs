@@ -189,15 +189,19 @@ async function renderAdmin() {
   return renderAdminList();
 }
 
-function renderAdminLogin() {
+async function renderAdminLogin() {
+  const state = await fetchJson('/api/state');
+  const title = state.body?.title ?? 'PartyDibs';
   const form = el(`
     <form>
-      <h1>Admin login</h1>
+      <h1></h1>
+      <h2>Admin login</h2>
       <div class="row"><input name="password" type="password" placeholder="Admin password" required maxlength="200" /></div>
       <button type="submit">Log in</button>
       <p class="error" hidden></p>
     </form>
   `);
+  form.querySelector('h1').textContent = title;
   const error = $('.error', form);
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
