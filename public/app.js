@@ -351,11 +351,13 @@ async function renderAdminList() {
 
   // Keep the existing add/bulk markup for now — restyled in tasks 10 and 11.
   const addForm = el(`
-    <form>
-      <h2>Add item</h2>
-      <div class="row"><input name="name" placeholder="Item name" required maxlength="100" /></div>
-      <div class="row"><input name="note" placeholder="Note (optional)" maxlength="500" /></div>
-      <button type="submit">Add</button>
+    <form class="form-card">
+      <div class="label">Add item</div>
+      <div class="row">
+        <input name="name" placeholder="Item name" required maxlength="100" />
+        <input name="note" placeholder="Note (optional)" maxlength="500" />
+        <button type="submit" class="btn btn-primary">Add</button>
+      </div>
       <p class="flash error" hidden></p>
     </form>
   `);
