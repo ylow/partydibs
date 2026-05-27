@@ -86,17 +86,21 @@ async function renderNamePrompt(onName) {
   const state = await fetchJson('/api/state');
   const title = state.body?.title ?? 'PartyDibs';
   const form = el(`
-    <form>
-      <h1></h1>
-      <h2>Who are you?</h2>
+    <form class="hero">
+      <h1 class="page-title"></h1>
+      <h2 class="subhead">Who are you?</h2>
       <p>Type a display name to claim items. Anyone who picks something up will see this name.</p>
-      <div class="row"><input name="name" placeholder="Your name" required maxlength="60" autofocus /></div>
-      <button type="submit">Continue</button>
-      <p class="error" hidden></p>
+      <div class="field-stack">
+        <input name="name" placeholder="Your name" required maxlength="60" autofocus />
+      </div>
+      <div class="field-stack">
+        <button type="submit" class="btn btn-primary btn-block">Continue</button>
+      </div>
+      <p class="flash error" hidden></p>
     </form>
   `);
-  form.querySelector('h1').textContent = title;
-  const error = $('.error', form);
+  form.querySelector('.page-title').textContent = title;
+  const error = $('.flash', form);
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     error.hidden = true;
