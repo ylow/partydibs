@@ -36,7 +36,7 @@
 
   --text: #3d2817;
   --text-soft: #8a6a4f;
-  --text-muted: #9a7a5e;
+  --text-muted: #6d4a2e;
   --ink: #5b1f1f;
 
   --accent: #c44536;
@@ -45,7 +45,7 @@
   --accent-soft: #fff3e5;
 
   --chip-bg: #f3e3d3;
-  --chip-text: #8a6a4f;
+  --chip-text: #6d4a2e;
   --border: #ead8c0;
 
   --success-bg: #e8efe0;
@@ -345,6 +345,7 @@ ul.items { list-style: none; padding: 0; margin: 0 0 1rem; }
 
 @media (max-width: 480px) {
   .form-card .row { flex-direction: column; }
+  .form-card .row .btn { width: 100%; }
 }
 
 /* --- Flash message ------------------------------------------ */

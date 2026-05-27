@@ -356,7 +356,7 @@ async function renderAdminList() {
       <div class="row">
         <input name="name" placeholder="Item name" required maxlength="100" />
         <input name="note" placeholder="Note (optional)" maxlength="500" />
-        <button type="submit" class="btn btn-primary btn-block">Add</button>
+        <button type="submit" class="btn btn-primary">Add</button>
       </div>
       <p class="flash error" hidden></p>
     </form>
@@ -385,6 +385,7 @@ async function renderAdminList() {
   app.append(titleRow, subtitle, list, addForm, bulkForm, footer);
 
   async function refresh() {
+    state.editingId = null;  // any in-flight edit row is about to be destroyed by list.innerHTML = ''
     const r = await fetchJson('/api/state');
     if (r.status !== 200) { h1.textContent = 'Error'; return; }
     h1.textContent = r.body.title;
