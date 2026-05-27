@@ -10,5 +10,5 @@ input, button { font: inherit; padding: 0.4rem 0.6rem; border-radius: 4px; borde
 button { cursor: pointer; }
 .error { color: #b00; }
 .msg { color: #060; }
-form.row { display: flex; gap: 0.5rem; margin: 0.5rem 0; }
-form.row input { flex: 1; }
+.row { display: flex; gap: 0.5rem; margin: 0.5rem 0; }
+.row input { flex: 1; }
