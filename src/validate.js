@@ -21,3 +21,12 @@ export function validateItemNote(raw) {
   if (value.length > 500) return { ok: false, error: 'must be at most 500 chars' };
   return { ok: true, value };
 }
+
+export function validateMessage(raw) {
+  if (raw === undefined || raw === null) return { ok: true, value: null };
+  if (typeof raw !== 'string') return { ok: false, error: 'must be a string' };
+  const value = raw.trim();
+  if (value.length === 0) return { ok: true, value: null };
+  if (value.length > 1000) return { ok: false, error: 'must be at most 1000 chars' };
+  return { ok: true, value };
+}

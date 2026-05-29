@@ -5,7 +5,8 @@ CREATE TABLE IF NOT EXISTS party (
   id              INTEGER PRIMARY KEY CHECK (id = 1),
   title           TEXT    NOT NULL,
   admin_pw_hash   TEXT    NOT NULL,
-  created_at      INTEGER NOT NULL
+  created_at      INTEGER NOT NULL,
+  message         TEXT
 );
 
 CREATE TABLE IF NOT EXISTS items (
@@ -33,4 +34,11 @@ export function openDb(path) {
 
 openDb.bootstrap = function bootstrap(db) {
   db.exec(SCHEMA);
+  // Existing databases predate the `message` column; CREATE TABLE IF NOT EXISTS
+  // won't add it, so patch it in.
+  const hasMessage = db
+    .prepare('PRAGMA table_info(party)')
+    .all()
+    .some((c) => c.name === 'message');
+  if (!hasMessage) db.exec('ALTER TABLE party ADD COLUMN message TEXT');
 };

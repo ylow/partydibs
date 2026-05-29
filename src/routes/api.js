@@ -5,6 +5,7 @@ import {
   validateItemName,
   validateItemNote,
   validateClaimerName,
+  validateMessage,
 } from '../validate.js';
 import {
   hashPassword,
@@ -86,14 +87,22 @@ export function mountApi(app, db) {
   });
 
   router.get('/state', (req, res) => {
-    const party = db.prepare('SELECT title FROM party WHERE id = 1').get();
+    const party = db.prepare('SELECT title, message FROM party WHERE id = 1').get();
     if (!party) return res.status(400).json({ error: 'not set up' });
     const items = db
       .prepare(
         'SELECT id, name, note, position, claimed_by, claimed_at FROM items ORDER BY position, id'
       )
       .all();
-    res.json({ title: party.title, items });
+    res.json({ title: party.title, message: party.message, items });
+  });
+
+  router.patch('/party', requireAdmin(db), (req, res) => {
+    const m = validateMessage(req.body?.message);
+    if (!m.ok) return res.status(400).json({ error: `message: ${m.error}` });
+    db.prepare('UPDATE party SET message = ? WHERE id = 1').run(m.value);
+    const row = db.prepare('SELECT message FROM party WHERE id = 1').get();
+    res.json({ message: row.message });
   });
 
   router.post('/items', requireAdmin(db), (req, res) => {

@@ -88,6 +88,44 @@ test('GET /api/state returns title and empty items after setup', async () => {
   assert.deepEqual(res.body.items, []);
 });
 
+test('GET /api/state returns message (null until set)', async () => {
+  const { app } = freshApp();
+  const agent = await setupAndLogin(app);
+  const before = await request(app).get('/api/state');
+  assert.equal(before.body.message, null);
+  await agent.patch('/api/party').send({ message: 'Bring a dish!' });
+  const after = await request(app).get('/api/state');
+  assert.equal(after.body.message, 'Bring a dish!');
+});
+
+test('PATCH /api/party requires admin', async () => {
+  const { app } = freshApp();
+  await request(app).post('/api/setup').send({ title: 'P', password: 'pw' });
+  const res = await request(app).patch('/api/party').send({ message: 'hi' });
+  assert.equal(res.status, 401);
+});
+
+test('PATCH /api/party sets, trims, and clears the message', async () => {
+  const { db, app } = freshApp();
+  const agent = await setupAndLogin(app);
+  const set = await agent.patch('/api/party').send({ message: '  Party at 7pm\nBYOB  ' });
+  assert.equal(set.status, 200);
+  assert.equal(set.body.message, 'Party at 7pm\nBYOB');
+  assert.equal(db.prepare('SELECT message FROM party WHERE id = 1').get().message, 'Party at 7pm\nBYOB');
+
+  const cleared = await agent.patch('/api/party').send({ message: '' });
+  assert.equal(cleared.status, 200);
+  assert.equal(cleared.body.message, null);
+  assert.equal(db.prepare('SELECT message FROM party WHERE id = 1').get().message, null);
+});
+
+test('PATCH /api/party rejects oversized message with 400', async () => {
+  const { app } = freshApp();
+  const agent = await setupAndLogin(app);
+  const res = await agent.patch('/api/party').send({ message: 'x'.repeat(1001) });
+  assert.equal(res.status, 400);
+});
+
 async function setupAndLogin(app) {
   const agent = request.agent(app);
   await agent.post('/api/setup').send({ title: 'P', password: 'pw' });

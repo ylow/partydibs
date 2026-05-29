@@ -6,6 +6,7 @@ import {
   validateItemNote,
   validateClaimerName,
   validatePassword,
+  validateMessage,
 } from '../src/validate.js';
 
 test('validateTitle trims, rejects empty and oversized', () => {
@@ -40,6 +41,18 @@ test('validatePassword rejects empty and >200', () => {
   assert.equal(validatePassword('').ok, false);
   assert.equal(validatePassword('x'.repeat(201)).ok, false);
   assert.equal(validatePassword('x'.repeat(200)).ok, true);
+});
+
+test('validateMessage allows empty/null (returns null), trims, rejects oversized', () => {
+  assert.deepEqual(validateMessage(undefined), { ok: true, value: null });
+  assert.deepEqual(validateMessage(null), { ok: true, value: null });
+  assert.deepEqual(validateMessage(''), { ok: true, value: null });
+  assert.deepEqual(validateMessage('   '), { ok: true, value: null });
+  assert.deepEqual(validateMessage('  Bring a dish!  '), { ok: true, value: 'Bring a dish!' });
+  assert.deepEqual(validateMessage('line 1\nline 2'), { ok: true, value: 'line 1\nline 2' });
+  assert.equal(validateMessage('x'.repeat(1000)).ok, true);
+  assert.equal(validateMessage('x'.repeat(1001)).ok, false);
+  assert.equal(validateMessage(42).ok, false);
 });
 
 test('validators reject non-string inputs', () => {

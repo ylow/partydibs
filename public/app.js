@@ -181,9 +181,10 @@ function renderGuestList(currentName) {
 
   const h1 = el('<h1 class="page-title">Loading…</h1>');
   const subtitle = el('<p class="subtitle"></p>');
+  const message = el('<div class="party-message" hidden></div>');
   const list = el('<ul class="items"></ul>');
   const msg = el('<p class="flash" hidden></p>');
-  app.append(header, h1, subtitle, list, msg);
+  app.append(header, h1, subtitle, message, list, msg);
 
   async function refresh() {
     const r = await fetchJson('/api/state');
@@ -193,6 +194,8 @@ function renderGuestList(currentName) {
       return;
     }
     h1.textContent = r.body.title;
+    if (r.body.message) { message.textContent = r.body.message; message.hidden = false; }
+    else { message.hidden = true; }
     const total = r.body.items.length;
     const claimed = r.body.items.filter((i) => i.claimed_by).length;
     subtitle.textContent = `${total} item${total === 1 ? '' : 's'} · ${claimed} claimed`;
@@ -347,6 +350,20 @@ async function renderAdminList() {
   `);
   const h1 = $('.page-title', titleRow);
   const subtitle = el('<p class="subtitle"></p>');
+
+  const messageForm = el(`
+    <form class="form-card">
+      <div class="label">Message (shown to guests)</div>
+      <p class="helper">Optional note at the top of the guest page. Plain text; line breaks are kept.</p>
+      <textarea name="message" rows="3" maxlength="1000"></textarea>
+      <div class="actions">
+        <button type="submit" class="btn btn-primary">Save message</button>
+      </div>
+      <p class="flash" hidden></p>
+    </form>
+  `);
+  const messageFlash = $('.flash', messageForm);
+
   const list = el('<ul class="items"></ul>');
 
   // Keep the existing add/bulk markup for now — restyled in tasks 10 and 11.
@@ -382,19 +399,31 @@ async function renderAdminList() {
   const footer = el('<div class="footer-actions"></div>');
   footer.appendChild(logoutBtn);
 
-  app.append(titleRow, subtitle, list, addForm, bulkForm, footer);
+  app.append(titleRow, subtitle, messageForm, list, addForm, bulkForm, footer);
 
   async function refresh() {
     state.editingId = null;  // any in-flight edit row is about to be destroyed by list.innerHTML = ''
     const r = await fetchJson('/api/state');
     if (r.status !== 200) { h1.textContent = 'Error'; return; }
     h1.textContent = r.body.title;
+    // Populate the message box once; later refreshes must not clobber in-progress edits.
+    if (!state.messageSynced) { messageForm.elements.message.value = r.body.message ?? ''; state.messageSynced = true; }
     const total = r.body.items.length;
     const claimed = r.body.items.filter((i) => i.claimed_by).length;
     subtitle.textContent = `${total} item${total === 1 ? '' : 's'} · ${claimed} claimed`;
     list.innerHTML = '';
     for (const it of r.body.items) list.appendChild(adminItemRow(it, refresh, state));
   }
+
+  messageForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    messageFlash.hidden = true;
+    const message = messageForm.elements.message.value;
+    const r = await fetchJson('/api/party', { method: 'PATCH', body: { message } });
+    if (r.status !== 200) { flash(messageFlash, r.body?.error ?? `error ${r.status}`); return; }
+    messageForm.elements.message.value = r.body.message ?? '';
+    flash(messageFlash, 'Message saved.', 'success');
+  });
 
   addForm.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -442,7 +471,7 @@ async function renderAdminList() {
     renderAdmin();
   });
 
-  const state = { editingId: null };
+  const state = { editingId: null, messageSynced: false };
   await refresh();
   setInterval(() => { if (state.editingId === null) refresh(); }, 5000);
 }
